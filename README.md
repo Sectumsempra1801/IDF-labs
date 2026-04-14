@@ -2,7 +2,7 @@
 
 ## 🛠 Tech Stack
 
-- MCU: ESP32-S3
+- MCU: ESP32
 - Framework: ESP-IDF v5.4
 - Protocols: SPI, I2C, UART, PWM
 
