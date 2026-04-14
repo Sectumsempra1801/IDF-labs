@@ -1,9 +1,7 @@
 # ESP-IDF temporary files
-build/
-sdkconfig
-sdkconfig.old
-sdkconfig.defaults
-dependencies.lock
+firmware/build/
+firmware/sdkconfig
+firmware/sdkconfig.old
 managed_components/
 
 # VS Code files
