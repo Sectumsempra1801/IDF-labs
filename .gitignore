@@ -1,8 +1,0 @@
-# ESP-IDF temporary files
-firmware/build/
-firmware/sdkconfig
-firmware/sdkconfig.old
-
-# VS Code files
-.vscode/
-*.code-workspace
