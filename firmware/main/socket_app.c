@@ -47,7 +47,7 @@ void udp_client_task(void *pvParameters)
 
         // Set timeout
         struct timeval timeout;
-        timeout.tv_sec = 10;
+        timeout.tv_sec = 100;
         timeout.tv_usec = 0;
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
 
@@ -88,7 +88,7 @@ void udp_client_task(void *pvParameters)
             }
             process_cmd(rx_buffer, sock);
 
-            vTaskDelay(2000 / portTICK_PERIOD_MS);
+            vTaskDelay(10 / portTICK_PERIOD_MS);
         }
 
         if (sock != -1)

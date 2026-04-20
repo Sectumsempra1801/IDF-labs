@@ -16,11 +16,11 @@
 
 #define MAIN_TAG "main"
 
-#define LED_1 5
-#define LED_2 6
+#define LED_1 4
+#define LED_2 5
 
-struct led_c LED1;
-struct led_c LED2;
+led_c_t LED1;
+led_c_t LED2;
 
 static esp_err_t wifi_enable(void)
 {
@@ -71,8 +71,10 @@ static esp_err_t ble_enable(void)
 
 void app_main(void)
 {
-    esp_err_t ret;
+    led_c_init(LED_1, 0, 0, &LED1);
+    led_c_init(LED_2, 1, 1, &LED2);
 
+    esp_err_t ret;
     // Initialize NVS.
     ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -100,10 +102,6 @@ void app_main(void)
 
     return;
 
-    led_c_init(LED_1, 0, 0, &LED1);
-    led_c_init(LED_2, 1, 1, &LED2);
-    led_c_on(&LED1);
-    led_c_on(&LED2);
     // while (1)
     // {
     // }
