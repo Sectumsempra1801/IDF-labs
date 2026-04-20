@@ -15,6 +15,7 @@ static void _blink_task(void *arg)
 //
 // PWM init
 static void _pwm_init(led_c_t *ledc)
+
 {
     if (ledc->pwm_initialized)
         return;
@@ -26,18 +27,18 @@ static void _pwm_init(led_c_t *ledc)
         .duty_resolution = LEDC_TIMER_13_BIT,
         .freq_hz = 4000,
         .speed_mode = LEDC_LOW_SPEED_MODE,
-        .timer_num = LEDC_TIMER_0,
+        .timer_num = ledc->timer,
         .clk_cfg = LEDC_AUTO_CLK};
     ledc_timer_config(&ledc_timer);
 
     // config channal in use
     ledc_channel_config_t ledc_channel = {
-        .channel = LEDC_CHANNEL_0,
+        .channel = ledc->channel,
         .duty = 0,
         .gpio_num = ledc->gpio_pin,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .hpoint = 0,
-        .timer_sel = LEDC_TIMER_0,
+        .timer_sel = ledc->timer,
         .flags.output_invert = 0};
     ledc_channel_config(&ledc_channel);
     // Initialize fade service
@@ -45,19 +46,40 @@ static void _pwm_init(led_c_t *ledc)
 
     ledc->pwm_initialized = 1;
 }
+// static adc_oneshot_unit_handle_t adc1_handle = NULL;
 
-void led_c_init(uint8_t pin, led_c_t *ledc)
+void led_c_init(uint8_t pin, uint8_t channel, uint8_t timer, led_c_t *ledc)
 {
-    ledc->gpio_pin = pin;
+    ledc->blink_task = NULL;
     ledc->time_blink_on_ms = 500;
     ledc->time_blink_off_ms = 500;
+
+    if (ledc->channel <= 4)
+    {
+        ledc->channel = channel;
+    }
+    else
+    {
+        ledc->channel = 0;
+    }
+
+    if (ledc->timer <= 5)
+    {
+        ledc->timer = timer;
+    }
+    else
+    {
+        ledc->timer = 0;
+    }
+
+    ledc->gpio_pin = pin;
+    ledc->current_mode = 0;
     ledc->frequency = 0;
+
+    ledc->pwm_initialized = 0;
     gpio_reset_pin(ledc->gpio_pin);
     gpio_set_direction(ledc->gpio_pin, GPIO_MODE_OUTPUT);
     gpio_set_level(ledc->gpio_pin, 0);
-    ledc->blink_task = NULL;
-    ledc->current_mode = 0;
-    ledc->pwm_initialized = 0;
 };
 
 void led_c_off(led_c_t *ledc)
@@ -119,6 +141,14 @@ void led_c_dim(uint8_t percentage, led_c_t *ledc)
     ledc_set_duty_and_update(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty, 0);
     ledc->current_mode = 3;
 };
+
+// void led_c_dim_adc(adc_oneshot_unit_handle_t adc_handle, adc_channel_t channel, led_c_t *ledc)
+// {
+//     int adc_raw = 0;
+//     uint8_t percentage = (uint8_t)((adc_raw * 100) / 4095);
+
+//     led_c_dim(percentage, ledc);
+// }
 
 uint8_t led_c_current_mode(led_c_t *ledc)
 {

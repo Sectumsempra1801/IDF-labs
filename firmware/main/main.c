@@ -12,11 +12,15 @@
 #include "ble.h"
 #include "wifi.h"
 #include "socket_app.h"
+#include "led_c.h"
 
 #define MAIN_TAG "main"
 
 #define LED_1 5
 #define LED_2 6
+
+struct led_c LED1;
+struct led_c LED2;
 
 static esp_err_t wifi_enable(void)
 {
@@ -95,8 +99,12 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     return;
-    struct led_c LED1;
-    led_c_init(LED_1, 0, 0, &LED1) while (1)
-    {
-    }
+
+    led_c_init(LED_1, 0, 0, &LED1);
+    led_c_init(LED_2, 1, 1, &LED2);
+    led_c_on(&LED1);
+    led_c_on(&LED2);
+    // while (1)
+    // {
+    // }
 }

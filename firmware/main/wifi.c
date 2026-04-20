@@ -12,7 +12,8 @@
 #include "lwip/sys.h"
 #include "wifi.h"
 #include "socket_app.h"
-
+TaskHandle_t udp_task_handle = NULL;
+TaskHandle_t tcp_task_handle = NULL;
 /* The examples use WiFi configuration that you can set via project configuration menu
 
    If you'd rather not, just change the below entries to strings with
@@ -41,9 +42,6 @@ static const char *TAG_SOCKET = "Socket";
 static int s_retry_num = 0;
 
 bool got_wifi_credentials = false;
-
-TaskHandle_t tcp_task_handle = NULL;
-TaskHandle_t udp_task_handle = NULL;
 
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
@@ -74,14 +72,14 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "    gateway  :" IPSTR, IP2STR(&event->ip_info.gw));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        if (tcp_task_handle == NULL)
-        {
-            xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5);
-            ESP_LOGI(TAG_SOCKET, "TCP task created successfully");
-        }
+        // if (tcp_task_handle == NULL)
+        // {
+        //     xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5, &tcp_task_handle);
+        //     ESP_LOGI(TAG_SOCKET, "TCP task created successfully");
+        // }
         if (udp_task_handle == NULL)
         {
-            xTaskCreate(udp_client_task, "udp_client", 4096, NULL, 5);
+            xTaskCreate(udp_client_task, "udp_client", 4096, NULL, 5, &udp_task_handle);
             ESP_LOGI(TAG_SOCKET, "UDP task created successfully");
         }
     }
