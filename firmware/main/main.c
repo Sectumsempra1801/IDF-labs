@@ -11,8 +11,12 @@
 #include "esp_bt.h"
 #include "ble.h"
 #include "wifi.h"
+#include "socket_app.h"
 
 #define MAIN_TAG "main"
+
+#define LED_1 5
+#define LED_2 6
 
 static esp_err_t wifi_enable(void)
 {
@@ -91,4 +95,8 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     return;
+    struct led_c LED1;
+    led_c_init(LED_1, 0, 0, &LED1) while (1)
+    {
+    }
 }
