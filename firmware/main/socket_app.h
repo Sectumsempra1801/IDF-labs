@@ -21,6 +21,12 @@ void tcp_client_task(void *pvParameters);
 
 void udp_client_task(void *pvParameters);
 
-void process_cmd(char *rx_buffer, int sock);
+void process_cmd(char *rx_buffer, int sock, struct sockaddr_storage *source_addr, socklen_t socklen);
+
+void send_reply(int sock, const char *msg, struct sockaddr_storage *addr, socklen_t addr_len);
+
+esp_err_t read_server_IP(void);
+
+esp_err_t save_server_IP(const char *sever_IP);
 
 #endif
