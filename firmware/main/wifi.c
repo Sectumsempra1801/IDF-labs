@@ -7,6 +7,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -27,6 +28,7 @@ TaskHandle_t tcp_task_handle = NULL;
 
 char g_ssid[32] = {0};
 char g_password[64] = {0};
+char g_server_ip[32] = "192.168.90.8";
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -72,11 +74,11 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "    gateway  :" IPSTR, IP2STR(&event->ip_info.gw));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        // if (tcp_task_handle == NULL)
-        // {
-        //     xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5, &tcp_task_handle);
-        //     ESP_LOGI(TAG_SOCKET, "TCP task created successfully");
-        // }
+        if (tcp_task_handle == NULL)
+        {
+            xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5, &tcp_task_handle);
+            ESP_LOGI(TAG_SOCKET, "TCP task created successfully");
+        }
         if (udp_task_handle == NULL)
         {
             xTaskCreate(udp_client_task, "udp_client", 4096, NULL, 5, &udp_task_handle);
@@ -85,6 +87,85 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
+esp_err_t read_wifi_credentials(void)
+{
+    nvs_handle_t my_handle;
+    esp_err_t err;
+    err = nvs_open("wifi_data", NVS_READONLY, &my_handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "WiFi credentials might not be saved yet");
+        return err;
+    }
+
+    // read SSID
+    size_t ssid_len = sizeof(g_ssid);
+    err = nvs_get_str(my_handle, "ssid", g_ssid, &ssid_len);
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "  'ssid'   not found in NVS");
+    }
+
+    // read Password
+    size_t pass_len = sizeof(g_password);
+    err = nvs_get_str(my_handle, "password", g_password, &pass_len);
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "'password' not found in NVS");
+    }
+
+    nvs_close(my_handle);
+
+    if (err == ESP_OK)
+    {
+        got_wifi_credentials = true;
+    }
+
+    return err;
+}
+
+esp_err_t save_wifi_credentials(const char *ssid, const char *password)
+{
+    nvs_handle_t my_handle;
+    esp_err_t err;
+    err = nvs_open("wifi_data", NVS_READWRITE, &my_handle);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+
+    // write SSID
+    err = nvs_set_str(my_handle, "ssid", ssid);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error occured while saving ssid(%s)", esp_err_to_name(err));
+        nvs_close(my_handle);
+        return err;
+    }
+
+    // write password
+    err = nvs_set_str(my_handle, "password", password);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error occured while saving password(%s)", esp_err_to_name(err));
+        nvs_close(my_handle);
+        return err;
+    }
+
+    // commit data
+    err = nvs_commit(my_handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error occured while committing NVS (%s)", esp_err_to_name(err));
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Data has been saved");
+    }
+    nvs_close(my_handle);
+
+    return err;
+}
 void wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
@@ -153,4 +234,49 @@ void wifi_init_sta(void)
     {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
+}
+
+esp_err_t wifi_enable(void)
+{
+    if (read_wifi_credentials() == ESP_OK)
+    {
+        ESP_LOGI(TAG, "SSID/PW has been found in flash NVS");
+    }
+    else
+    {
+        ESP_LOGW(TAG, "SSID/PW has 'not' been found in flash NVS");
+    }
+    while (!got_wifi_credentials)
+    {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    wifi_init_sta();
+
+    return ESP_OK;
+}
+void update_wifi_config_and_reconnect(void)
+{
+    wifi_config_t wifi_config = {0};
+
+    strncpy((char *)wifi_config.sta.ssid, g_ssid, sizeof(wifi_config.sta.ssid));
+    strncpy((char *)wifi_config.sta.password, g_password, sizeof(wifi_config.sta.password));
+
+    wifi_config.sta.threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD;
+    wifi_config.sta.sae_pwe_h2e = ESP_WIFI_SAE_MODE;
+    strncpy((char *)wifi_config.sta.sae_h2e_identifier, EXAMPLE_H2E_IDENTIFIER, sizeof(wifi_config.sta.sae_h2e_identifier));
+
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+
+    s_retry_num = 0;
+
+    if (s_wifi_event_group != NULL)
+    {
+        xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT | WIFI_CONNECTED_BIT);
+    }
+
+    ESP_LOGI(TAG, "Wi-Fi config updated. Disconnecting and reconnecting...");
+
+    esp_wifi_disconnect();
+    esp_wifi_connect();
 }
