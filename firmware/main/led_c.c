@@ -1,6 +1,7 @@
 #include "led_c.h"
 #define LEDC_MAX_DUTY ((1 << 13) - 1) // 8191
 // blink task
+static const char *TAG = "LED_C";
 static void _blink_task(void *arg)
 {
     led_c_t *ledc = (led_c_t *)arg;
@@ -41,8 +42,6 @@ static void _pwm_init(led_c_t *ledc)
         .timer_sel = ledc->timer,
         .flags.output_invert = 0};
     ledc_channel_config(&ledc_channel);
-    // Initialize fade service
-    ledc_fade_func_install(0);
 
     ledc->pwm_initialized = 1;
 }
@@ -54,22 +53,22 @@ void led_c_init(uint8_t pin, uint8_t channel, uint8_t timer, led_c_t *ledc)
     ledc->time_blink_on_ms = 500;
     ledc->time_blink_off_ms = 500;
 
-    if (ledc->channel <= 4)
+    if (channel < LEDC_CHANNEL_MAX)
     {
         ledc->channel = channel;
     }
     else
     {
-        ledc->channel = 0;
+        ledc->channel = LEDC_CHANNEL_0;
     }
 
-    if (ledc->timer <= 5)
+    if (timer < LEDC_TIMER_MAX)
     {
         ledc->timer = timer;
     }
     else
     {
-        ledc->timer = 0;
+        ledc->timer = LEDC_TIMER_0;
     }
 
     ledc->gpio_pin = pin;
@@ -86,12 +85,27 @@ void led_c_off(led_c_t *ledc)
 {
     // gpio_set_direction(ledc->gpio_pin, GPIO_MODE_OUTPUT);
 
+    if (ledc->current_mode == 2)
+    {
+        led_c_blink_stop(ledc);
+    }
+    if (ledc->current_mode == 3)
+    {
+        ledc_stop(LEDC_LOW_SPEED_MODE, ledc->channel, 0);
+    }
+
+    gpio_set_direction(ledc->gpio_pin, GPIO_MODE_OUTPUT);
     gpio_set_level(ledc->gpio_pin, 0);
     ledc->current_mode = 0;
 };
 
 void led_c_on(led_c_t *ledc)
 {
+    if (ledc->current_mode == 2)
+        led_c_blink_stop(ledc);
+    if (ledc->current_mode == 3)
+        ledc_stop(LEDC_LOW_SPEED_MODE, ledc->channel, 0);
+
     gpio_set_direction(ledc->gpio_pin, GPIO_MODE_OUTPUT);
     gpio_set_level(ledc->gpio_pin, 1);
     ledc->current_mode = 1;
@@ -101,18 +115,24 @@ void led_c_blink(uint8_t hz, led_c_t *ledc)
 {
     ledc->frequency = hz;
     if (ledc->frequency == 0)
-        return;
-    ledc->time_blink_off_ms = 1000 / 2 / ledc->frequency;
-    ledc->time_blink_on_ms = 1000 / 2 / ledc->frequency;
-    if (ledc->blink_task)
     {
-        ledc->current_mode = 2;
+        ESP_LOGE(TAG, "Invalid frequency");
         return;
     }
-    gpio_set_direction(ledc->gpio_pin, GPIO_MODE_OUTPUT);
-    xTaskCreate(_blink_task, "led_blink", 1024,
-                ledc, 5, &ledc->blink_task);
-    ledc->current_mode = 2;
+    else
+    {
+        ledc->time_blink_off_ms = 1000 / 2 / ledc->frequency;
+        ledc->time_blink_on_ms = 1000 / 2 / ledc->frequency;
+        if (ledc->blink_task)
+        {
+            ledc->current_mode = 2;
+            return;
+        }
+        gpio_set_direction(ledc->gpio_pin, GPIO_MODE_OUTPUT);
+        xTaskCreate(_blink_task, "led_blink", 1024,
+                    ledc, 5, &ledc->blink_task);
+        ledc->current_mode = 2;
+    }
 };
 
 void led_c_blink_stop(led_c_t *ledc)
@@ -138,7 +158,7 @@ void led_c_dim(uint8_t percentage, led_c_t *ledc)
     // ADC 13bit => (2^13 - 1) / 100 = 8191
     uint32_t duty = ((uint32_t)percentage * 8191) / 100;
 
-    ledc_set_duty_and_update(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty, 0);
+    ledc_set_duty_and_update(LEDC_LOW_SPEED_MODE, ledc->channel, duty, 0);
     ledc->current_mode = 3;
 };
 

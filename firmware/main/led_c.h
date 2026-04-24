@@ -1,17 +1,10 @@
-#ifndef LED_C
-#define LED_C
+#ifndef LED_C_H
+#define LED_C_H
 #include "driver/ledc.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-// #include "esp_adc/adc_oneshot.h"
-// typedef enum
-// {
-//     LED_MODE_OFF,
-//     LED_MODE_ON,
-//     LED_MODE_BLINK,
-//     LED_MODE_PWM
-// } led_mode_t;
+#include "esp_log.h"
 typedef struct led_c
 {
     // 4 byte
