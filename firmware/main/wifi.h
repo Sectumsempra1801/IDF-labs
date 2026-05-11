@@ -4,26 +4,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "esp_wifi.h"
 
-extern bool got_wifi_credentials;
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT BIT1
 
-extern char g_ssid[32];
+EventGroupHandle_t wifi_get_event_group(void);
 
-extern char g_password[64];
+extern bool wifi_connected;
 
-extern char g_server_ip[32];
 /**
  * @brief Initialize Wi-Fi in station mode and
  * connect to the AP using the provided credentials.
  */
 void wifi_init_sta(void);
 
-esp_err_t read_wifi_credentials(void);
+void wifi_connect(void);
 
-esp_err_t save_wifi_credentials(const char *ssid, const char *password);
-
-esp_err_t wifi_enable(void);
-
-void update_wifi_config_and_reconnect(void);
-
-#endif /* WIFI_H */
+#endif

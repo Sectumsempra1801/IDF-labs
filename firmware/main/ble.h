@@ -9,6 +9,7 @@
 #include "esp_bt_device.h"
 #include "esp_gatt_common_api.h"
 #include "esp_log.h"
+#include "esp_wifi.h"
 
 /**
  * @brief Initialize the Bluetooth controller in BLE mode.
@@ -30,6 +31,6 @@ esp_err_t ble_callbacks_register(void);
  */
 esp_err_t ble_gatts_app_init(void);
 
-esp_err_t ble_enable(void);
+void ble_enable(void);
 
 #endif /* _BLE_H_ */

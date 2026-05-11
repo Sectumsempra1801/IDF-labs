@@ -13,22 +13,17 @@
 #include "lwip/sys.h"
 #include "wifi.h"
 #include "socket_app.h"
-TaskHandle_t udp_task_handle = NULL;
-TaskHandle_t tcp_task_handle = NULL;
+#include "flash_manager.h"
+
 /* The examples use WiFi configuration that you can set via project configuration menu
 
    If you'd rather not, just change the below entries to strings with
    the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
 */
-#define EXAMPLE_ESP_MAXIMUM_RETRY 5
-
+#define EXAMPLE_ESP_MAXIMUM_RETRY 3
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_BOTH
 #define EXAMPLE_H2E_IDENTIFIER ""
 #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
-
-char g_ssid[32] = {0};
-char g_password[64] = {0};
-char g_server_ip[32] = "192.168.90.8";
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -36,35 +31,38 @@ static EventGroupHandle_t s_wifi_event_group;
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT BIT1
+// #define WIFI_CONNECTED_BIT BIT0
+// #define WIFI_FAIL_BIT BIT1
+EventGroupHandle_t wifi_get_event_group(void)
+{
+    return s_wifi_event_group;
+}
+bool wifi_connected = false;
 
-static const char *TAG = "wifi station";
-static const char *TAG_SOCKET = "Socket";
+static const char *TAG = "wifi";
+
 static int s_retry_num = 0;
-
-bool got_wifi_credentials = false;
 
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
-        esp_wifi_connect();
+        ESP_LOGI(TAG, "WiFi driver started. Waiting for connect command...");
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
+        wifi_connected = false;
         if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY)
         {
             esp_wifi_connect();
             s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
+            ESP_LOGI(TAG, "Retry to connect to the AP... (%d/%d)", s_retry_num, EXAMPLE_ESP_MAXIMUM_RETRY);
         }
         else
         {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGI(TAG, "connect to the AP fail");
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
@@ -74,104 +72,15 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "    gateway  :" IPSTR, IP2STR(&event->ip_info.gw));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        if (tcp_task_handle == NULL)
-        {
-            xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5, &tcp_task_handle);
-            ESP_LOGI(TAG_SOCKET, "TCP task created successfully");
-        }
-        if (udp_task_handle == NULL)
-        {
-            xTaskCreate(udp_client_task, "udp_client", 4096, NULL, 5, &udp_task_handle);
-            ESP_LOGI(TAG_SOCKET, "UDP task created successfully");
-        }
+        wifi_connected = true;
     }
 }
 
-esp_err_t read_wifi_credentials(void)
-{
-    nvs_handle_t my_handle;
-    esp_err_t err;
-    err = nvs_open("wifi_data", NVS_READONLY, &my_handle);
-    if (err != ESP_OK)
-    {
-        ESP_LOGW(TAG, "WiFi credentials might not be saved yet");
-        return err;
-    }
-
-    // read SSID
-    size_t ssid_len = sizeof(g_ssid);
-    err = nvs_get_str(my_handle, "ssid", g_ssid, &ssid_len);
-    if (err != ESP_OK)
-    {
-        ESP_LOGW(TAG, "  'ssid'   not found in NVS");
-    }
-
-    // read Password
-    size_t pass_len = sizeof(g_password);
-    err = nvs_get_str(my_handle, "password", g_password, &pass_len);
-    if (err != ESP_OK)
-    {
-        ESP_LOGW(TAG, "'password' not found in NVS");
-    }
-
-    nvs_close(my_handle);
-
-    if (err == ESP_OK)
-    {
-        got_wifi_credentials = true;
-    }
-
-    return err;
-}
-
-esp_err_t save_wifi_credentials(const char *ssid, const char *password)
-{
-    nvs_handle_t my_handle;
-    esp_err_t err;
-    err = nvs_open("wifi_data", NVS_READWRITE, &my_handle);
-    if (err != ESP_OK)
-    {
-        return err;
-    }
-
-    // write SSID
-    err = nvs_set_str(my_handle, "ssid", ssid);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Error occured while saving ssid(%s)", esp_err_to_name(err));
-        nvs_close(my_handle);
-        return err;
-    }
-
-    // write password
-    err = nvs_set_str(my_handle, "password", password);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Error occured while saving password(%s)", esp_err_to_name(err));
-        nvs_close(my_handle);
-        return err;
-    }
-
-    // commit data
-    err = nvs_commit(my_handle);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Error occured while committing NVS (%s)", esp_err_to_name(err));
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Data has been saved");
-    }
-    nvs_close(my_handle);
-
-    return err;
-}
 void wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
-
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_create_default_wifi_sta();
 
@@ -180,103 +89,75 @@ void wifi_init_sta(void)
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
+
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
                                                         &event_handler,
                                                         NULL,
                                                         &instance_any_id));
+
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_STA_GOT_IP,
                                                         &event_handler,
                                                         NULL,
                                                         &instance_got_ip));
 
-    wifi_config_t wifi_config = {0};
-
-    strncpy((char *)wifi_config.sta.ssid, g_ssid, sizeof(wifi_config.sta.ssid));
-    strncpy((char *)wifi_config.sta.password, g_password, sizeof(wifi_config.sta.password));
-
-    wifi_config.sta.threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD;
-    wifi_config.sta.sae_pwe_h2e = ESP_WIFI_SAE_MODE;
-    strncpy((char *)wifi_config.sta.sae_h2e_identifier,
-            EXAMPLE_H2E_IDENTIFIER,
-            sizeof(wifi_config.sta.sae_h2e_identifier));
-
-#ifdef CONFIG_ESP_WIFI_WPA3_COMPATIBLE_SUPPORT
-    wifi_config.sta.disable_wpa3_compatible_mode = 0;
-#endif
-
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "wifi_init_sta finished.");
-
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                           pdFALSE,
-                                           pdFALSE,
-                                           portMAX_DELAY);
-
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
-    if (bits & WIFI_CONNECTED_BIT)
-    {
-        ESP_LOGI(TAG, "Connected to ap SSID: %s password: %s successfully", g_ssid, g_password);
-    }
-    else if (bits & WIFI_FAIL_BIT)
-    {
-        ESP_LOGI(TAG, "Failed to connect to SSID: %s, password: %s", g_ssid, g_password);
-    }
-    else
-    {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-    }
+    ESP_LOGI(TAG, "wifi_init finished. Driver is ready.");
 }
 
-esp_err_t wifi_enable(void)
-{
-    if (read_wifi_credentials() == ESP_OK)
-    {
-        ESP_LOGI(TAG, "SSID/PW has been found in flash NVS");
-    }
-    else
-    {
-        ESP_LOGW(TAG, "SSID/PW has 'not' been found in flash NVS");
-    }
-    while (!got_wifi_credentials)
-    {
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-
-    wifi_init_sta();
-
-    return ESP_OK;
-}
-void update_wifi_config_and_reconnect(void)
+void wifi_connect(void)
 {
     wifi_config_t wifi_config = {0};
-
     strncpy((char *)wifi_config.sta.ssid, g_ssid, sizeof(wifi_config.sta.ssid));
     strncpy((char *)wifi_config.sta.password, g_password, sizeof(wifi_config.sta.password));
-
-    wifi_config.sta.threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD;
-    wifi_config.sta.sae_pwe_h2e = ESP_WIFI_SAE_MODE;
-    strncpy((char *)wifi_config.sta.sae_h2e_identifier, EXAMPLE_H2E_IDENTIFIER, sizeof(wifi_config.sta.sae_h2e_identifier));
+    esp_wifi_disconnect();
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 
     s_retry_num = 0;
+    xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
 
-    if (s_wifi_event_group != NULL)
-    {
-        xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT | WIFI_CONNECTED_BIT);
-    }
-
-    ESP_LOGI(TAG, "Wi-Fi config updated. Disconnecting and reconnecting...");
-
-    esp_wifi_disconnect();
+    ESP_LOGI(TAG, "Connecting to AP: %s", g_ssid);
     esp_wifi_connect();
+
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                           pdFALSE, pdFALSE, portMAX_DELAY);
+
+    if (bits & WIFI_CONNECTED_BIT)
+    {
+        wifi_connected = true;
+    }
+    else
+    {
+        wifi_connected = false;
+    }
 }
+// void update_wifi_config_and_reconnect(void)
+// {
+//     wifi_config_t wifi_config = {0};
+
+//     strncpy((char *)wifi_config.sta.ssid, g_ssid, sizeof(wifi_config.sta.ssid));
+//     strncpy((char *)wifi_config.sta.password, g_password, sizeof(wifi_config.sta.password));
+
+//     wifi_config.sta.threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD;
+//     wifi_config.sta.sae_pwe_h2e = ESP_WIFI_SAE_MODE;
+//     strncpy((char *)wifi_config.sta.sae_h2e_identifier, EXAMPLE_H2E_IDENTIFIER, sizeof(wifi_config.sta.sae_h2e_identifier));
+
+//     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+
+//     s_retry_num = 0;
+
+//     if (s_wifi_event_group != NULL)
+//     {
+//         xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT | WIFI_CONNECTED_BIT);
+//     }
+
+//     ESP_LOGI(TAG, "Wi-Fi config updated. Disconnecting and reconnecting...");
+
+//     esp_wifi_disconnect();
+//     esp_wifi_connect();
+// }

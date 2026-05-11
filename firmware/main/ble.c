@@ -12,6 +12,7 @@
 #include "ble.h"
 #include "wifi.h"
 #include "socket_app.h"
+#include "flash_manager.h"
 
 #define GATTS_TAG "BLE"
 
@@ -501,8 +502,10 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 save_wifi_credentials(g_ssid, g_password);
                 // read immediately
                 read_wifi_credentials();
+                wifi_connected = false;
+                esp_wifi_disconnect();
                 // reconnect with new creds
-                update_wifi_config_and_reconnect();
+                // update_wifi_config_and_reconnect();
             }
             else if (parse_server_ip(rx_text, g_server_ip, sizeof(g_server_ip)))
             {
@@ -801,7 +804,7 @@ esp_err_t ble_gatts_app_init(void)
 
     return ESP_OK;
 }
-esp_err_t ble_enable(void)
+void ble_enable(void)
 {
     esp_err_t ret;
 
@@ -809,29 +812,29 @@ esp_err_t ble_enable(void)
     if (ret != ESP_OK)
     {
         ESP_LOGE(GATTS_TAG, "ble_controller_init failed");
-        return ret;
+        ESP_ERROR_CHECK(ret);
     }
 
     ret = ble_stack_init();
     if (ret != ESP_OK)
     {
         ESP_LOGE(GATTS_TAG, "ble_stack_init failed");
-        return ret;
+        ESP_ERROR_CHECK(ret);
     }
 
     ret = ble_callbacks_register();
     if (ret != ESP_OK)
     {
         ESP_LOGE(GATTS_TAG, "ble_callbacks_register failed");
-        return ret;
+        ESP_ERROR_CHECK(ret);
     }
 
     ret = ble_gatts_app_init();
     if (ret != ESP_OK)
     {
         ESP_LOGE(GATTS_TAG, "ble_gatts_app_init failed");
-        return ret;
+        ESP_ERROR_CHECK(ret);
     }
 
-    return ESP_OK;
+    ESP_LOGI(GATTS_TAG, "BLE enabled successfully");
 }
