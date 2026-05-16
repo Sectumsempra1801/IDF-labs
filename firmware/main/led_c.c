@@ -49,6 +49,11 @@ static void _pwm_init(led_c_t *ledc)
 
 void led_c_init(uint8_t pin, uint8_t channel, uint8_t timer, led_c_t *ledc)
 {
+    if (ledc == NULL || pin >= 50)
+    {
+        ESP_LOGE(TAG, "Invalid parameters");
+        return;
+    }
     ledc->blink_task = NULL;
     ledc->time_blink_on_ms = 500;
     ledc->time_blink_off_ms = 500;
@@ -113,6 +118,17 @@ void led_c_on(led_c_t *ledc)
 
 void led_c_blink(uint8_t hz, led_c_t *ledc)
 {
+    if (ledc == NULL)
+    {
+        ESP_LOGE(TAG, "Invalid ledc pointer");
+        return;
+    }
+
+    if (hz == 0 || hz > 100)
+    {
+        ESP_LOGE(TAG, "Invalid frequency: %d", hz);
+        return;
+    }
     ledc->frequency = hz;
     if (ledc->frequency == 0)
     {
@@ -137,7 +153,12 @@ void led_c_blink(uint8_t hz, led_c_t *ledc)
 
 void led_c_blink_stop(led_c_t *ledc)
 {
-    if (ledc->blink_task)
+    if (ledc == NULL)
+    {
+        ESP_LOGE(TAG, "Invalid ledc pointer");
+        return;
+    }
+    if (ledc->blink_task == NULL)
     {
         vTaskDelete(ledc->blink_task);
         ledc->blink_task = NULL;
