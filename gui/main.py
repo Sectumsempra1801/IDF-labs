@@ -13,8 +13,8 @@ class BLEGuiApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("ESP BLE Wi-Fi & IP Provisioner")
-        self.root.geometry("760x580")
-        self.root.minsize(760, 580)
+        self.root.geometry("650x500")
+        self.root.minsize(650, 500)
         self.root.resizable(False, False)
 
         self.client = None
@@ -39,58 +39,72 @@ class BLEGuiApp:
         vcmd = (self.root.register(self.validate_input), '%P')
 
         # --- Device Selection --- (Row 0)
-        ttk.Label(main, text="Select Device:").grid(row=0, column=0, sticky="w", padx=pad_x, pady=pad_y)
-        self.device_selector = ttk.Combobox(main, state="readonly", width=45)
-        self.device_selector.grid(row=0, column=1, sticky="ew", padx=pad_x, pady=pad_y)
+        ttk.Label(main, text="Select Device     :").place(x=0, y=0)
+        self.device_selector = ttk.Combobox(main, state="readonly", width=50)
+        self.device_selector.place(x=100, y=0)
         self.device_selector.set("Click 'Scan' to find devices...")
 
         self.scan_btn = ttk.Button(main, text="Scan", command=self.scan_device)
-        self.scan_btn.grid(row=0, column=2, padx=pad_x, pady=pad_y)
-
-        # --- SSID --- (Row 1)
-        ttk.Label(main, text="SSID (max 32):").grid(row=1, column=0, sticky="w", padx=pad_x, pady=pad_y)
-        self.ssid_var = tk.StringVar()
-        self.ssid_entry = ttk.Entry(main, textvariable=self.ssid_var, width=30, validate="key", validatecommand=vcmd)
-        self.ssid_entry.grid(row=1, column=1, sticky="ew", padx=pad_x, pady=pad_y)
+        self.scan_btn.place(x=450, y=-2)
 
         self.connect_btn = ttk.Button(main, text="Connect BLE", command=self.connect_device)
-        self.connect_btn.grid(row=1, column=2, padx=pad_x, pady=pad_y)
+        self.connect_btn.place(x=550, y=-2)
 
-        # --- Password --- (Row 2)
-        ttk.Label(main, text="Password (8-32):").grid(row=2, column=0, sticky="w", padx=pad_x, pady=pad_y)
+        # --- SSID --- (Row 1)
+        ttk.Label(main, text="SSID (max 32)    :").place(x = 0, y = 30)
+        self.ssid_var = tk.StringVar()
+        self.ssid_entry = ttk.Entry(main, textvariable=self.ssid_var, width=50, validate="key", validatecommand=vcmd)
+        self.ssid_entry.place(x=100, y=30)
+        self.ssid_entry.insert(0,"Tam")
+
+        # --- Password --- (Row 3)
+        ttk.Label(main, text="Password (8-32):").place(x=0,y=60)
         self.pw_var = tk.StringVar()
-        self.pw_entry = ttk.Entry(main, textvariable=self.pw_var, width=30, validate="key", validatecommand=vcmd) 
-        self.pw_entry.grid(row=2, column=1, sticky="ew", padx=pad_x, pady=pad_y)
+        self.pw_entry = ttk.Entry(main, textvariable=self.pw_var, width=50, validate="key", validatecommand=vcmd) 
+        self.pw_entry.place(x=100, y=60)
+        self.pw_entry.insert(0,"o903903126")
 
         self.send_wifi_btn = ttk.Button(main, text="Send Wi-Fi", command=self.send_credentials, state="disabled")
-        self.send_wifi_btn.grid(row=2, column=2, padx=pad_x, pady=pad_y)
+        self.send_wifi_btn.place(x=450, y=58)
 
-        # --- Server IP --- (Row 3) - 
-        ttk.Label(main, text="Server IP:").grid(row=3, column=0, sticky="w", padx=pad_x, pady=pad_y)
+        # --- Server IP --- (Row 4) 
+        ttk.Label(main, text="Server IP             :").place(x=0,y=90)
         self.ip_var = tk.StringVar()
-        self.ip_entry = ttk.Entry(main, textvariable=self.ip_var, width=30) 
-        self.ip_entry.grid(row=3, column=1, sticky="ew", padx=pad_x, pady=pad_y)
+        self.ip_entry = ttk.Entry(main, textvariable=self.ip_var, width=50) 
+        self.ip_entry.place(x=100, y=90)
 
         self.send_ip_btn = ttk.Button(main, text="Send IP", command=self.send_server_ip, state="disabled")
-        self.send_ip_btn.grid(row=3, column=2, padx=pad_x, pady=pad_y)
+        self.send_ip_btn.place(x=450,y=88)
 
-        # --- Status --- (Row 4)
-        ttk.Label(main, text="Status:").grid(row=4, column=0, sticky="nw", padx=pad_x, pady=pad_y)
+         # --- Status --- (Row 5)
+        ttk.Label(main, text="URL                     :").place(x=0,y=120)
+        self.url_var = tk.StringVar()
+        self.url_entry = ttk.Entry(main, textvariable=self.url_var, width=50) 
+        self.url_entry.place(x=100,y=120)
+        self.url_entry.insert(0, "http://httpforever.com/") 
+ 
+        self.send_url_btn = ttk.Button(main, text="Send URL", command=self.send_url, state="disabled")
+        self.send_url_btn.place(x=450,y=118)
+
+        self.get_method_btn =  ttk.Button(main, text="GET", command=self.get_method, state="disabled")
+        self.get_method_btn.place(x=550,y=118)
+        # --- Status --- (Row 6)
+        ttk.Label(main, text="Status:").place(x=0, y=150)
         self.status_var = tk.StringVar(value="DISCONNECTED")
         self.status_label = ttk.Label(main, textvariable=self.status_var, font=("Arial", 10, "bold"), foreground="red")
-        self.status_label.grid(row=4, column=1, sticky="w", padx=pad_x, pady=pad_y)
+        self.status_label.place(x=100,y=150)
 
         self.disconnect_btn = ttk.Button(main, text="Disconnect", command=self.disconnect_device, state="disabled")
-        self.disconnect_btn.grid(row=4, column=2, padx=pad_x, pady=pad_y)
+        self.disconnect_btn.place(x=450,y=150)
 
-        # --- Log --- (Row 5)
-        self.log_text = tk.Text(main, height=12, width=45)
+        # --- Log --- (Row 7)
+        self.log_text = tk.Text(main, height=12, width=70)
         self.log_text.tag_config("error", foreground="red")
         self.log_text.tag_config("success", foreground="green")
         self.log_text.tag_config("info", foreground="blue")
-        self.log_text.grid(row=5, column=1, columnspan=2, sticky="nsew", padx=pad_x, pady=pad_y)
+        self.log_text.place(x=0,y=180)
 
-        main.columnconfigure(1, weight=1)
+        main.columnconfigure(1, weight=0)
 
     def validate_input(self, new_value):
         """Logic to restrict entry to 32 characters maximum."""
@@ -117,16 +131,22 @@ class BLEGuiApp:
                 else:
                     self._log("Disconnected from device", "info")
                     self.status_var.set("DISCONNECTED")
-                
+
+                self.device_selector.config(state="normal")
                 self.status_label.config(foreground="red")
                 self.send_wifi_btn.config(state="disabled")
                 self.send_ip_btn.config(state="disabled")
+                self.send_url_btn.config(state="disabled")
+                self.get_method_btn.config(state="disabled")
                 self.disconnect_btn.config(state="disabled")
                 self.connect_btn.config(state="normal")
             else:
                 self.status_var.set("CONNECTED")
+                self.device_selector.config(state="disabled")
                 self.status_label.config(foreground="green")
                 self.send_wifi_btn.config(state="normal")
+                self.send_url_btn.config(state="normal")
+                self.get_method_btn.config(state="normal")
                 self.send_ip_btn.config(state="normal")
                 self.disconnect_btn.config(state="normal")
                 self.connect_btn.config(state="disabled")
@@ -234,6 +254,20 @@ class BLEGuiApp:
         self._log(f"Sending IP: {payload}")
         self._run_async(self._send_payload_async(payload))
 
+    def send_url(self):
+        url = self.url_var.get().strip()
+        if not url:
+            self._log("Error: URL cannot be empty","error")
+            return
+        
+        payload =f'url="{url}"'
+        self._log(f"Sending URL: {payload}")
+        self._run_async(self._send_payload_async(payload))
+
+    def get_method (self):
+        payload = 'method="GET"'
+        self._log(f"The request's query parameters.")
+        self._run_async(self._send_payload_async(payload))
 
     async def _send_payload_async(self, payload: str):
         if self.client and self.client.is_connected:
