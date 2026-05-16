@@ -13,10 +13,6 @@ EventGroupHandle_t wifi_get_event_group(void);
 
 extern bool wifi_connected;
 
-/**
- * @brief Initialize Wi-Fi in station mode and
- * connect to the AP using the provided credentials.
- */
 void wifi_init_sta(void);
 
 void wifi_connect(void);

@@ -107,7 +107,11 @@ void wifi_init_sta(void)
 
     ESP_LOGI(TAG, "wifi_init finished. Driver is ready.");
 }
-
+// in main.c
+// if ((got_wifi_credentials) && !(wifi_connected))
+//         {
+//             wifi_connect();
+//         }
 void wifi_connect(void)
 {
     wifi_config_t wifi_config = {0};
