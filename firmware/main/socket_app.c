@@ -81,7 +81,9 @@ void tcp_client_task(void *pvParameters)
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 continue;
             }
-
+            // Set timeout
+            struct timeval timeout = {.tv_sec = 5, .tv_usec = 0};
+            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
             // Connect
             struct sockaddr_in dest_addr = {
                 .sin_family = AF_INET,
@@ -114,7 +116,7 @@ void tcp_client_task(void *pvParameters)
                     .type = SOCKET_TCP,
                     .socklen = 0};
                 strncpy(msg.payload, rx_buffer, sizeof(msg.payload) - 1);
-
+                msg.payload[sizeof(msg.payload) - 1] = '\0';
                 if (xQueueSend(socket_rx_queue, &msg, pdMS_TO_TICKS(100)) != pdPASS)
                 {
                     ESP_LOGW(TAG, "TCP: Queue_1 full, dropped message");
@@ -440,7 +442,7 @@ esp_err_t save_server_IP(const char *server_IP)
     esp_err_t err = nvs_write_string("wifi_data", "server_IP", server_IP);
     if (err == ESP_OK)
     {
-        ESP_LOGI(TAG, "✓ Server IP saved");
+        ESP_LOGI(TAG, "Server IP saved");
     }
     return err;
 }
