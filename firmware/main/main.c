@@ -15,6 +15,7 @@
 #include "socket_app.h"
 #include "led_c.h"
 #include "flash_manager.h"
+#include "http_request.h"
 
 #define LED_1 4
 #define LED_2 5
@@ -27,6 +28,7 @@ void app_main(void)
 {
     led_c_init(LED_1, 0, 0, &LED1);
     led_c_init(LED_2, 1, 1, &LED2);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     // Initialize NVS
     nvs_manager_init();
     // Initialize BLE
@@ -36,6 +38,8 @@ void app_main(void)
     // Read SSID and Password in flash
     err = read_wifi_credentials();
     // init socket sys
+    http_client_init();
+
     socket_system_init();
     while (1)
     {
@@ -43,7 +47,10 @@ void app_main(void)
         {
             wifi_connect();
         }
-
+        // if ((wifi_connected) && !(http_task_created))
+        // {
+        //     http_client_init();
+        // }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
